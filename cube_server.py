@@ -16,6 +16,7 @@ def run():
             recv_raw = udp_socket.recvfrom(9000)
             recv_data = json.loads(recv_raw[0].decode())
             dest_addr = recv_raw[1]
+            # 使用kociemba包来计算魔方解法
             ret = kociemba.solve(recv_data)
             print(ret)
         except Exception as e:

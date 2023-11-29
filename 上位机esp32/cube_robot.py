@@ -15,19 +15,20 @@ led1 = Pin(17, Pin.OUT, value=0)
 led2 = Pin(5, Pin.OUT, value=0)
 
 # 设置电机的转动的时间，最小值为45。
-durtion_time = 65
-durtion_rotate_time = 65
+duration_time = 65
+duration_rotate_time = 65
 
+# 颜色传感器TCS34725使用I2C进行连接通信
 senor1 = I2C(1, scl=Pin(18), sda=Pin(19), freq=400_000)
 senor2 = I2C(0, scl=Pin(22), sda=Pin(21), freq=400_000)
-
 color1 = TCS34725(senor1, 0x29)
 color2 = TCS34725(senor2, 0x29)
 
+# esp32连接wifi,用于后续与服务器通迅
 ip = connect()
-reciever_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+receiver_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 local_addr = (ip, 80)
-reciever_udp.bind(local_addr)
+receiver_udp.bind(local_addr)
 
 FLAG = False
 current_size_list = ["F", "R", "B", "L"]
@@ -52,17 +53,6 @@ button1.irq(trigger=Pin.IRQ_FALLING, handler=start_end)
 button2.irq(trigger=Pin.IRQ_FALLING, handler=interrupt)
 
 color_map = {
-    'R1': [(50, 69.9999), (4, 13), (2, 8)],
-    'R2': [(70, 79.9999), (5.763148, 11.96308), (2.7, 6.848065)],
-    'L1': [(70, 88), (4.2, 5.99999), (1, 1.99999)],
-    'L2': [(78, 80), (4.2, 6.9), (2, 2.69999)],
-    'L3': [(80, 88), (4.2, 10), (1, 5)],
-    'D1': [(0.1, 3), (19, 32), (15, 44)],
-    'U1': [(1, 5), (51, 70), (2.5, 9)],
-    'B1': [(7, 15), (21, 32.999999), (5, 12)],
-    'F1': [(7, 18), (33, 49), (0.5, 4.999999)]
-}
-color_map = {
     'R': [(85, 130), (2, 5.4), (1, 4)],
     'L': [(63, 91), (4.561579, 10), (0.1, 3)],
     'D': [(0.1, 4), (16, 27), (31, 49)],
@@ -73,6 +63,9 @@ color_map = {
 
 
 def led_switch(status):
+    '''
+    控制颜色感应器上面的LED灯光的快关
+    '''
     if status == "on":
         led1.value(1)
         led2.value(1)
@@ -82,20 +75,23 @@ def led_switch(status):
 
 
 def sizeUD_rotate(degree, collections=None):
+    '''
+    用于魔方FRBL面的切换，同时也可以在旋转的进行各个魔方面的颜色采集
+    :param degree:需要旋转的度数，1表示90度，2表示180度以此类推
+    :param collections:需要采集各个面颜色
+    '''
     global cube_colors
-    # 13 为极限，最慢90
-    # 旋转 630碰到弹簧 
-    durtion = durtion_time if collections else durtion_rotate_time
+    duration = duration_time if collections else duration_rotate_time
     hand1_dir.value(0)
     hand2_dir.value(1)
     total_steps = 800 * degree
     for step in range(total_steps):
         hand1.value(1)
         hand2.value(1)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
         hand1.value(0)
         hand2.value(0)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
         if collections is not None and step % 400 == 0:
             index = step // 400
             num1, num2 = collections[index]
@@ -115,6 +111,10 @@ def sizeUD_rotate(degree, collections=None):
 
 
 def color2str():
+    '''
+    将采集到的各个面的颜色数值转换给对应各个面的字符串数据
+    :return:
+    '''
     global cube_colors, color_map
     cube_str = {}
     center_str = {
@@ -168,8 +168,11 @@ def color2str():
 
 
 def sizeFRBL_rotate(degree, size=None):
+    '''
+    上位机实现魔方FRBL面的顺时针和逆时针的拧动
+    '''
     global current_size_list
-    durtion = durtion_rotate_time if size else durtion_time
+    duration = duration_rotate_time if size else duration_time
     if size:
         index = current_size_list.index(size)
         start = current_size_list[0:index]
@@ -179,19 +182,22 @@ def sizeFRBL_rotate(degree, size=None):
     hand3_dir.value(1 if degree > 0 else 0)
     for i in range(800 * abs(degree) + 230):
         hand3.value(1)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
         hand3.value(0)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
     hand3_dir.value(0 if degree > 0 else 1)
     for i in range(230):
         hand3.value(1)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
         hand3.value(0)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
 
 
 def sizeU_rotate(degree):
-    durtion = durtion_rotate_time
+    '''
+     上位机实现魔方U面的顺时针和逆时针的拧动
+    '''
+    duration = duration_rotate_time
     if degree < 0:
         new_degree = abs(degree)
     else:
@@ -204,19 +210,22 @@ def sizeU_rotate(degree):
     over_step = 40
     for step in range(total_steps + over_step):
         hand2.value(1)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
         hand2.value(0)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
     hand2_dir.value(1)
     for step in range(over_step):
         hand2.value(1)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
         hand2.value(0)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
 
 
 def sizeD_rotate(degree):
-    durtion = durtion_rotate_time
+    '''
+     上位机实现魔方D面的顺时针和逆时针的拧动
+    '''
+    duration = duration_rotate_time
     if degree > 0:
         new_degree = abs(degree)
     else:
@@ -226,20 +235,23 @@ def sizeD_rotate(degree):
     over_step = 40
     for step in range(total_steps + over_step):
         hand1.value(1)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
         hand1.value(0)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
     hand1_dir.value(0)
     for step in range(over_step):
         hand1.value(1)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
         hand1.value(0)
-        utime.sleep_us(durtion)
+        utime.sleep_us(duration)
 
 
-def robot_exec_handle(slove_list):
+def robot_exec_handle(solve_list):
+    '''
+    根据服务器返回的魔方公式，转换为上位机每一步的动作，并传递给上位机进行执行
+    '''
     robot_exec_list = []
-    for size in slove_list:
+    for size in solve_list:
         if len(size) == 1:
             robot_exec_list.append((size, 1))
         else:
@@ -258,9 +270,10 @@ def robot_exec_handle(slove_list):
     print(robot_exec_list)
 
 
-def color_collection():
+def color_collect_exec():
     global led1, led2, FLAG, current_size_list
     current_size_list = ["F", "R", "B", "L"]
+    # 旋转魔方进行颜色采集的位置对应表
     collect_color_map = [
         [3, [(36, 42), (23, 48), (38, 44), (10, 43), (9, 15), (50, 21), (11, 17)]],
         [2, [(0, 0), (37, 16), (33, 27), (19, 52), (0, 6)]],
@@ -283,13 +296,14 @@ def color_collection():
         print("cube_colors:", cube_colors)
         cube_str = color2str()
         buffer = json.dumps(cube_str).encode()
-        reciever_udp.sendto(buffer, ("10.255.255.199", 9000))
-        recv_data = reciever_udp.recvfrom(9000)
+        # 发送魔方数据给服务器，让服务器进行计算魔方公式
+        receiver_udp.sendto(buffer, ("10.255.255.199", 9000))
+        recv_data = receiver_udp.recvfrom(9000)
         msg = json.loads(recv_data[0].decode())
         if msg:
-            slove_list = msg.split(" ")
-            print("slove_list:", len(slove_list), slove_list)
-            robot_exec_handle(slove_list)
+            solve_list = msg.split(" ")
+            print("solve_list:", len(solve_list), solve_list)
+            robot_exec_handle(solve_list)
         else:
             print("魔方数据解法出错")
     finally:
@@ -303,7 +317,7 @@ def main():
         try:
             if FLAG:
                 start = time.ticks_ms()
-                color_collection()
+                color_collect_exec()
                 delta = time.ticks_diff(time.ticks_ms(), start)
                 print("总执行时间为:", delta / 1000)
             time.sleep(0.1)
